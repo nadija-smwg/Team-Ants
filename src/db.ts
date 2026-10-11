@@ -63,6 +63,16 @@ export function errorText(e: unknown) {
     e && typeof e === "object" && "message" in e
       ? String(e.message)
       : String(e);
+  // HTTP 404 means the Supabase project URL is wrong, or the tables haven't
+  // been created yet (schema not applied). Give the team a clear next step.
+  if (
+    /404|not found/i.test(message) ||
+    (e &&
+      typeof e === "object" &&
+      "status" in e &&
+      (e as { status: unknown }).status === 404)
+  )
+    return "Database not found (404). Run supabase/schema.sql in your Supabase SQL Editor to create the workspace tables, then reload. Your local data is safe.";
   if (/schema cache|does not exist/i.test(message))
     return "Private workspace setup is needed. Run supabase/schema.sql in your Supabase SQL Editor, then try again. Your local data is safe.";
   return message;
