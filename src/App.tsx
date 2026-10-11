@@ -883,6 +883,11 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {ws.error && (
+              <p role="alert" className="form-error">
+                {ws.error}
+              </p>
+            )}
             <label className="field stage-field">
               <span>Move this hackathon forward</span>
               <select
@@ -1019,6 +1024,11 @@ export default function App() {
                 ? " Linked tasks and resources will stay in your team workspace."
                 : ""}
             </p>
+            {ws.error && (
+              <p role="alert" className="form-error">
+                {ws.error}
+              </p>
+            )}
           </div>
           <div className="modal-footer">
             <button
