@@ -1,18 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Competition, Resource, Task, Member, Workspace } from "./data";
+import type { Competition, Resource, Task, Workspace } from "./data";
+
 const url = import.meta.env.VITE_SUPABASE_URL || "";
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 export const configured = Boolean(url && key);
 export const supabase = configured ? createClient(url, key) : null;
+
 export type DataSet = {
   competitions: Competition[];
   tasks: Task[];
   resources: Resource[];
 };
+
 export async function loadData(workspaceId: string): Promise<DataSet> {
   if (!supabase)
     throw new Error(
-      "Cloud connection is not configured. Your local workspace is available.",
+      "Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to .env",
     );
   const [cs, ts, rs] = await Promise.all([
     supabase
@@ -38,33 +41,25 @@ export async function loadData(workspaceId: string): Promise<DataSet> {
     resources: rs.data || [],
   };
 }
-export async function loadWorkspace(): Promise<{
-  workspace: Workspace | null;
-  members: Member[];
-}> {
-  if (!supabase) return { workspace: null, members: [] };
+
+export async function loadWorkspace(): Promise<Workspace | null> {
+  if (!supabase) return null;
   const { data, error } = await supabase
     .from("ants_workspaces")
-    .select("*")
+    .select("id, name")
     .order("created_at")
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  if (!data) return { workspace: null, members: [] };
-  const result = await supabase
-    .from("ants_members")
-    .select("user_id,display_name,role")
-    .eq("workspace_id", data.id);
-  if (result.error) throw result.error;
-  return { workspace: data, members: result.data || [] };
+  return data ?? null;
 }
+
 export function errorText(e: unknown) {
   const message =
     e && typeof e === "object" && "message" in e
       ? String(e.message)
       : String(e);
-  // HTTP 404 means the Supabase project URL is wrong, or the tables haven't
-  // been created yet (schema not applied). Give the team a clear next step.
+  // HTTP 404 means tables haven't been created yet (schema not applied).
   if (
     /404|not found/i.test(message) ||
     (e &&
@@ -72,8 +67,8 @@ export function errorText(e: unknown) {
       "status" in e &&
       (e as { status: unknown }).status === 404)
   )
-    return "Database not found (404). Run supabase/schema.sql in your Supabase SQL Editor to create the workspace tables, then reload. Your local data is safe.";
+    return "Database not found (404). Run supabase/schema.sql in your Supabase SQL Editor to create the workspace tables, then reload.";
   if (/schema cache|does not exist/i.test(message))
-    return "Private workspace setup is needed. Run supabase/schema.sql in your Supabase SQL Editor, then try again. Your local data is safe.";
+    return "Database tables missing. Run supabase/schema.sql in your Supabase SQL Editor, then reload.";
   return message;
 }

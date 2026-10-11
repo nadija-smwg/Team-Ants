@@ -1,122 +1,29 @@
 import { useState } from "react";
-import {
-  Cloud,
-  Copy,
-  Download,
-  Upload,
-  LogOut,
-  ShieldCheck,
-  Users,
-  ArrowRight,
-  HardDrive,
-  RefreshCw,
-} from "lucide-react";
-import type { Session } from "@supabase/supabase-js";
-import { supabase, configured, errorText, type DataSet } from "./db";
-import type { Member, Workspace, Task } from "./data";
+import { Download, Upload, ShieldCheck, Users, RefreshCw } from "lucide-react";
+import { errorText, type DataSet } from "./db";
+import type { Member, Task, Workspace } from "./data";
 import { Avatar, Badge, Modal } from "./ui";
-import {
-  downloadFile,
-  validateData,
-  emptyData,
-  readLocal,
-  prepareCloudImport,
-} from "./model";
+import { downloadFile, validateData } from "./model";
+
 export default function Team({
   members,
   tasks,
   workspace,
-  session,
-  cloud,
   data,
   reload,
-  local,
-  connect,
-  replace,
   notify,
 }: {
   members: Member[];
   tasks: Task[];
   workspace: Workspace | null;
-  session: Session | null;
-  cloud: boolean;
   data: DataSet;
   reload: () => Promise<void>;
-  local: () => void;
-  connect: () => void;
-  replace: (d: DataSet) => Promise<boolean>;
   notify: (s: string) => void;
 }) {
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [teamName, setTeamName] = useState("Team Ants");
-  const [code, setCode] = useState("");
-  const [join, setJoin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [sent, setSent] = useState(false);
   const [pending, setPending] = useState<DataSet | null>(null);
-  const [reset, setReset] = useState(false);
-  async function auth() {
-    if (!supabase) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin + window.location.pathname,
-        },
-      });
-      if (error) throw error;
-      setSent(true);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function setup() {
-    if (!supabase) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { error } = await supabase.rpc(
-        join ? "ants_join_workspace" : "ants_create_workspace",
-        join
-          ? { invite: code.trim(), display_name: name.trim() }
-          : { team_name: teamName.trim(), display_name: name.trim() },
-      );
-      if (error) throw error;
-      await reload();
-      notify(
-        join ? "Welcome to the team!" : "Your private workspace is ready.",
-      );
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function copyLocal() {
-    if (!supabase || !workspace) return;
-    setBusy(true);
-    setError("");
-    try {
-      const payload = prepareCloudImport(readLocal());
-      const result = await supabase.rpc("ants_import_workspace", {
-        target: workspace.id,
-        payload,
-      });
-      if (result.error) throw result.error;
-      await reload();
-      notify("Your local data is now in the team workspace.");
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+
   async function importFile(file?: File) {
     if (!file) return;
     setError("");
@@ -128,9 +35,11 @@ export default function Team({
       setError(errorText(e));
     }
   }
+
   return (
     <>
       <div className="team-grid">
+        {/* Members panel */}
         <section className="panel">
           <div className="section-title">
             <h2>The people behind the ideas</h2>
@@ -155,214 +64,50 @@ export default function Team({
             );
           })}
           <p className="panel-note">
-            {cloud
-              ? "Members can manage hackathons, tasks, and resources in this private workspace."
-              : "This local roster helps assign work. Connect a private workspace to invite real teammates."}
+            Members can manage hackathons, tasks, and resources. Data syncs
+            across all browsers via Supabase.
           </p>
         </section>
+
+        {/* Workspace info panel */}
         <section className="connect-card">
           <span className="connect-icon">
-            <Cloud size={25} />
+            <ShieldCheck size={25} />
           </span>
-          <h2>
-            {cloud && workspace
-              ? "A shared home for your team."
-              : "Build together. Stay in sync."}
-          </h2>
+          <h2>Shared cloud workspace.</h2>
           <p>
-            {cloud && workspace
-              ? "Only signed-in members can access your team’s workspace. Refresh to see your teammates’ latest updates."
-              : "Connect a private workspace to share hackathons, deadlines, and resources across devices."}
+            All data is stored in your private Supabase project and synced
+            across every browser automatically — no login required.
           </p>
-          {cloud && workspace ? (
-            <>
-              <div className="invite-code">
-                <code>{workspace.invite_code}</code>
-                <button
-                  className="icon-button"
-                  aria-label="Copy invite code"
-                  onClick={() =>
-                    void navigator.clipboard
-                      .writeText(workspace.invite_code)
-                      .then(() => notify("Invite code copied"))
-                      .catch(() =>
-                        setError(
-                          "Could not copy. Select and copy the code manually.",
-                        ),
-                      )
-                  }
-                >
-                  <Copy size={16} />
-                </button>
-              </div>
-              <small>
-                Share this code privately. Teammates sign in, then choose “Join
-                a team”.
-              </small>
-              <div className="actions">
-                <button
-                  className="button secondary"
-                  onClick={() => void reload()}
-                >
-                  <RefreshCw size={15} />
-                  Refresh
-                </button>
-                <button className="button secondary" onClick={local}>
-                  <HardDrive size={15} />
-                  Local workspace
-                </button>
-              </div>
-            </>
-          ) : session ? (
-            cloud ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void setup();
-                }}
-              >
-                <div className="segmented">
-                  <button
-                    type="button"
-                    className={!join ? "active" : ""}
-                    onClick={() => setJoin(false)}
-                  >
-                    Create a team
-                  </button>
-                  <button
-                    type="button"
-                    className={join ? "active" : ""}
-                    onClick={() => setJoin(true)}
-                  >
-                    Join a team
-                  </button>
-                </div>
-                <label className="field">
-                  <span>Your name</span>
-                  <input
-                    required
-                    maxLength={60}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="How your team knows you"
-                  />
-                </label>
-                {join ? (
-                  <label className="field">
-                    <span>Invite code</span>
-                    <input
-                      required
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="Paste your team's code"
-                    />
-                  </label>
-                ) : (
-                  <label className="field">
-                    <span>Team name</span>
-                    <input
-                      required
-                      maxLength={80}
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                    />
-                  </label>
-                )}
-                <button
-                  className="button primary"
-                  disabled={busy || !name.trim()}
-                >
-                  {busy
-                    ? "Connecting…"
-                    : join
-                      ? "Join workspace"
-                      : "Create workspace"}
-                  <ArrowRight size={16} />
-                </button>
-              </form>
-            ) : (
-              <button className="button primary" onClick={connect}>
-                Open shared workspace
-                <ArrowRight size={16} />
-              </button>
-            )
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void auth();
-              }}
-            >
-              <label className="field">
-                <span>Email address</span>
-                <input
-                  required
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@university.edu"
-                />
-              </label>
-              <button className="button primary" disabled={busy || !configured}>
-                {busy
-                  ? "Sending…"
-                  : sent
-                    ? "Send another sign-in link"
-                    : "Email me a sign-in link"}
-                <ArrowRight size={16} />
-              </button>
-              {sent && (
-                <p role="status" className="success-message">
-                  Check your inbox for a sign-in link. It will bring you back
-                  here.
-                </p>
-              )}
-              {!configured && (
-                <p>
-                  Add your Supabase URL and publishable key to enable team
-                  syncing.
-                </p>
-              )}
-            </form>
+          {workspace && (
+            <div className="invite-code">
+              <code style={{ fontSize: "0.8rem", letterSpacing: 0 }}>
+                {workspace.name}
+              </code>
+            </div>
           )}
-          {session && (
+          <div className="actions">
             <button
-              className="text-link signout"
-              onClick={() =>
-                void supabase?.auth.signOut().then(({ error }) => {
-                  if (error) setError(error.message);
-                  else notify("Signed out. Your local workspace is available.");
-                })
-              }
+              className="button secondary"
+              onClick={() => void reload()}
+              disabled={busy}
             >
-              <LogOut size={14} />
-              Sign out of {session.user.email}
+              <RefreshCw size={15} />
+              Refresh from cloud
             </button>
-          )}
+          </div>
         </section>
       </div>
+
+      {/* Backups */}
       <div className="team-grid settings-grid">
         <section className="panel">
           <span className="section-label">YOUR DATA, IN YOUR HANDS</span>
           <h2>Workspace backups</h2>
           <p>
             Download all hackathons, tasks, and resources in one portable
-            backup. Keep a copy before moving devices.
+            backup.
           </p>
-          {cloud &&
-            workspace &&
-            !data.competitions.length &&
-            !data.tasks.length &&
-            !data.resources.length && (
-              <button
-                className="button primary"
-                disabled={busy}
-                onClick={() => void copyLocal()}
-              >
-                <Upload size={16} />
-                {busy ? "Copying…" : "Copy local data to this team"}
-              </button>
-            )}
           <div className="actions">
             <button
               className="button secondary"
@@ -378,70 +123,46 @@ export default function Team({
               <Download size={16} />
               Download backup
             </button>
-            {!cloud && (
-              <label className="button secondary upload-button">
-                <Upload size={16} />
-                Restore backup
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={(e) => {
-                    void importFile(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
           </div>
-          {!cloud && (
-            <button className="text-link muted" onClick={() => setReset(true)}>
-              Start a fresh local workspace
-            </button>
+          {error && (
+            <div role="alert" className="error-banner">
+              {error}
+            </div>
           )}
         </section>
+
         <section className="panel storage-panel">
           <ShieldCheck size={24} />
-          <h2>{cloud ? "Private team storage" : "Saved on this device"}</h2>
+          <h2>Private cloud storage</h2>
           <p>
-            {cloud
-              ? "Your team data is protected by workspace membership. Members can edit shared records."
-              : "Changes are saved in this browser. They stay here when you reload, but clearing browser data removes them. Use backups to keep a separate copy."}
+            Your data lives in your own Supabase project. Changes appear
+            instantly in every browser — Chrome, Edge, or any device.
           </p>
           <div className="storage-foot">
             <Users size={15} />
             {workspace?.name || "Team Ants"}
             <span>•</span>
-            {cloud ? "Cloud workspace" : "Local workspace"}
+            Cloud workspace
           </div>
         </section>
       </div>
-      {error && (
-        <div role="alert" className="error-banner">
-          {error}
-        </div>
-      )}
-      {(pending || reset) && (
+
+      {/* Restore modal */}
+      {pending && (
         <Modal
-          title={
-            reset ? "Start with a clean slate?" : "Restore this workspace?"
-          }
-          close={() => {
-            setPending(null);
-            setReset(false);
-          }}
+          title="Restore this backup?"
+          close={() => setPending(null)}
         >
           <div className="form-content">
             <p>
-              This replaces the data in this browser. Download a backup first if
-              you want to keep your current workspace.
+              This will replace all data in your Supabase workspace. Download a
+              backup first if you want to keep your current data.
             </p>
-            {pending && (
-              <p>
-                {pending.competitions.length} hackathons ·{" "}
-                {pending.tasks.length} tasks · {pending.resources.length}{" "}
-                resources
-              </p>
-            )}
+            <p>
+              {pending.competitions.length} hackathons ·{" "}
+              {pending.tasks.length} tasks · {pending.resources.length}{" "}
+              resources
+            </p>
           </div>
           <div className="modal-footer">
             <button
@@ -462,19 +183,32 @@ export default function Team({
               className="button primary"
               onClick={async () => {
                 setBusy(true);
-                if (await replace(pending || emptyData())) {
-                  setPending(null);
-                  setReset(false);
-                  notify("Local workspace updated");
-                }
+                setPending(null);
+                notify("Restore via JSON import is not yet supported for cloud-only mode.");
                 setBusy(false);
               }}
             >
-              Confirm {reset ? "reset" : "restore"}
+              Confirm restore
             </button>
           </div>
         </Modal>
       )}
+
+      {/* Import button — for future use */}
+      <div style={{ display: "none" }}>
+        <label className="button secondary upload-button">
+          <Upload size={16} />
+          Restore backup
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={(e) => {
+              void importFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
     </>
   );
 }

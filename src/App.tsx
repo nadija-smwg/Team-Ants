@@ -105,7 +105,7 @@ const TITLES: Record<Page, { title: string; description: string }> = {
 };
 export default function App() {
   const ws = useWorkspace();
-  const { data, members, cloud, busy, loading } = ws;
+  const { data, members, busy, loading } = ws;
   const { competitions, tasks, resources } = data;
   const [page, setPage] = useState<Page>("Overview");
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -251,7 +251,7 @@ export default function App() {
   async function save(type: EntityType, item: Entry) {
     if (await ws.save(type, item)) {
       setEditor(null);
-      setToast("Saved to your " + (cloud ? "team workspace" : "browser"));
+      setToast("Saved to your team workspace");
     }
   }
   const toggle = async (t: Task) => {
@@ -441,33 +441,17 @@ export default function App() {
             <div className="error-banner" role="alert">
               <span>{ws.error}</span>
               <button onClick={() => void ws.reload()}>Retry</button>
-              {cloud && <button onClick={ws.local}>Use local workspace</button>}
             </div>
           )}
-          {!cloud && (
+          {!ws.workspace && !loading && page !== "Team & settings" && (
             <div className="local-notice">
               <span>
-                <span className="status-dot" />
-                Local workspace{" "}
-                <span className="notice-detail">
-                  · Saved in this browser. Starter events are examples; verify
-                  their dates.
-                </span>
+                No workspace found. Run <strong>supabase/schema.sql</strong> in
+                your Supabase SQL Editor to set up the database.
               </span>
-              <button onClick={() => go("Team & settings")}>
-                Connect your team
-                <ArrowUpRight size={13} />
-              </button>
-            </div>
-          )}
-          {cloud && !ws.workspace && !loading && page !== "Team & settings" && (
-            <div className="local-notice">
-              <span>
-                Create or join a private workspace to start collaborating.
-              </span>
-              <button onClick={() => go("Team & settings")}>
-                Set up your team
-                <ArrowRight size={14} />
+              <button onClick={() => void ws.reload()}>
+                Retry
+                <RefreshCw size={13} />
               </button>
             </div>
           )}
@@ -812,12 +796,7 @@ export default function App() {
                   tasks={tasks}
                   data={data}
                   workspace={ws.workspace}
-                  session={ws.session}
-                  cloud={cloud}
                   reload={ws.reload}
-                  local={ws.local}
-                  connect={ws.connect}
-                  replace={ws.replaceLocal}
                   notify={setToast}
                 />
               )}
@@ -829,16 +808,14 @@ export default function App() {
               Less chaos. More building.
             </span>
             <span>
-              TEAM ANTS <i /> {cloud ? "PRIVATE WORKSPACE" : "LOCAL WORKSPACE"}
-              {cloud && (
-                <button
-                  className="icon-button"
-                  aria-label="Refresh workspace"
-                  onClick={() => void ws.reload()}
-                >
-                  <RefreshCw size={13} />
-                </button>
-              )}
+              TEAM ANTS <i /> CLOUD WORKSPACE
+              <button
+                className="icon-button"
+                aria-label="Refresh workspace"
+                onClick={() => void ws.reload()}
+              >
+                <RefreshCw size={13} />
+              </button>
             </span>
           </footer>
         </main>
@@ -1093,10 +1070,10 @@ export default function App() {
             <div>
               <Cloud />
               <span>
-                <strong>4. Bring the team along</strong>
+                <strong>4. Sync across browsers</strong>
                 <p>
-                  Use Team & settings to connect a private workspace or download
-                  a backup.
+                  All data is saved to your private Supabase project. Open the
+                  app in any browser and see the same data instantly.
                 </p>
               </span>
             </div>

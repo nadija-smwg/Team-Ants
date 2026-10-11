@@ -48,7 +48,7 @@ export type Resource = {
   created_at?: string;
 };
 export type Member = { user_id: string; display_name: string; role: string };
-export type Workspace = { id: string; name: string; invite_code: string };
+export type Workspace = { id: string; name: string };
 export const uid = () => crypto.randomUUID();
 export const sampleCompetitions: Competition[] = [
   {
