@@ -75,6 +75,7 @@ export default function Editor({
         type={kind}
         required={required}
         maxLength={kind === "text" ? 200 : undefined}
+        max={kind === "date" ? "9999-12-31" : undefined}
         value={form[key] || ""}
         placeholder={placeholder}
         onInput={(e) => change(key, e.currentTarget.value)}
